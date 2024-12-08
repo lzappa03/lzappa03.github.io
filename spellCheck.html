@@ -1,1 +1,113 @@
-<p>yay</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spell Checker</title>
+      
+</head>
+<body>
+    <h1>Spell Checker</h1>
+    <form id="spellCheckerForm" onsubmit="spellCheck(); return false;">
+        <label for="inputWord">Enter a word:</label><br>
+        <input type="text" id="inputWord" placeholder="Type here" /><br>
+        <button type="submit">Submit</button>
+    </form>
+    <br>
+    <h4>Suggestions:</h4>
+    <div id="output"></div>
+
+    <script>
+        let dictionary = [];
+        let isDictionaryLoaded = false;
+
+        async function loadDict() {
+            try {
+                const response = await fetch('dictionary.txt');
+                const text = await response.text();
+                dictionary = text.split('\n').map(word => word.trim().toLowerCase());
+                isDictionaryLoaded = true;
+                console.log("Yippee");
+            } catch (error) {
+                console.error("There was an error loading the dictionary", error);
+            }
+        }
+
+        function isVowel(letter){
+            let regex = /^[aeiouAEIOU]$/;
+            if (regex.test(letter)) {
+                //console.log("true");
+                return true;
+            }
+            //console.log("false");
+            return false;
+        }
+
+        function getMinPenalty(input, word) {
+            let mismatch = 1;
+            let gap = 2;
+            let inputLength = input.length;
+            let wordLength = word.length;
+
+            let table = Array.from({ length: inputLength + 1 }, () =>
+                Array(wordLength + 1).fill(0)
+            );
+
+            for (let i = 0; i <= inputLength; i++) table[i][0] = i * gap;
+            for (let j = 0; j <= wordLength; j++) table[0][j] = j * gap;
+
+            for (let i = 1; i <= inputLength; i++) {
+                for (let j = 1; j <= wordLength; j++) {
+                    if (input.charAt(i - 1) === word.charAt(j - 1)) {
+                        mismatch = 0;
+                    } else if (
+                        isVowel(input.charAt(i - 1)) &&
+                        isVowel(word.charAt(j - 1))
+                    ) {
+                        mismatch = 3;
+                    } else {
+                        mismatch = 1;
+                    }
+                    table[i][j] = Math.min(
+                        table[i - 1][j - 1] + mismatch,
+                        table[i - 1][j] + gap,
+                        table[i][j - 1] + gap
+                    );
+                }
+            }
+
+            return table[inputLength][wordLength];
+        }
+
+        function spellCheck() {
+            const inputWord = document.getElementById("inputWord").value.trim().toLowerCase();
+
+            if (!isDictionaryLoaded) {
+                alert("The dictionary is still loading. Please wait.");
+                return;
+            }
+
+            if (!inputWord) {
+                alert("Please enter a word.");
+                return;
+            }
+
+            const distances = dictionary.map(word => ({
+                word,
+                distance: getMinPenalty(inputWord, word)
+            }));
+
+            distances.sort((a, b) => a.distance - b.distance);
+
+            const suggestions = distances.slice(0, 10);
+
+            const output = document.getElementById("output");
+            output.innerHTML = `
+                <div>${suggestions.map(s => s.word).join("<br>")}</div>
+            `;
+        }
+
+        window.onload = loadDict;
+    </script>
+</body>
+</html>
